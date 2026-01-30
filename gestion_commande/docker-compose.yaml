@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  mysql-gestion-commande-service:
+    image: mysql:8.0
+    container_name: mysql-gestion-commande
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db_gestion_commande
+      MYSQL_USER: devops
+      MYSQL_PASSWORD: devopspass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_gestion_commande_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend-gestion-commande-service:
+    image: ${BACKEND_IMAGE}:${BACKEND_TAG}
+    container_name: backend-gestion-commande
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-gestion-commande-service:3306/db_gestion_commande?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: devops
+      SPRING_DATASOURCE_PASSWORD: devopspass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      mysql-gestion-commande-service:
+        condition: service_healthy
+
+  phpmyadmin-gestion-commande-service:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin-gestion-commande
+    restart: always
+    depends_on:
+      - mysql-gestion-commande-service
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql-gestion-commande-service
+
+  frontend-gestion-commande-service:
+    image: ${FRONTEND_IMAGE}:${FRONTEND_TAG}
+    container_name: frontend-gestion-commande
+    restart: always
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend-gestion-commande-service
+
+volumes:
+  mysql_gestion_commande_data:
