@@ -46,3 +46,17 @@ mvn clean compile
 
 # 3. Lancez l'application
 mvn spring-boot:run
+
+
+Accès aux interfaces
+🌐 API REST : http://localhost:8085/api
+
+📚 Swagger UI : http://localhost:8085/swagger-ui.html
+
+🗄️ Console H2 : http://localhost:8085/h2-console
+
+URL JDBC : jdbc:h2:mem:testdb
+
+Utilisateur : sa
+
+Mot de passe : (laisser vide)
