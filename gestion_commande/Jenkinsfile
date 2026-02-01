@@ -19,32 +19,32 @@ pipeline {
 
         stage('Compile') {
             steps {
-                bat 'mvn clean compile'
+                bat 'mvnw.cmd clean compile'
             }
         }
 
         stage('Test') {
             steps {
-                bat 'mvn test'
+                bat 'mvnw.cmd test'
             }
         }
 
         stage('Package') {
             steps {
-                bat 'mvn clean package -DskipTests'
+                bat 'mvnw.cmd clean package -DskipTests'
             }
         }
-
+        
         stage('Archive') {
             steps {
                 archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
             }
         }
     }
-
+    
     post {
         success {
-            echo '✅ Backend Spring Boot build réussi!'
+            echo '✅ Build Spring Boot réussi!'
         }
         failure {
             echo '❌ Build échoué'
