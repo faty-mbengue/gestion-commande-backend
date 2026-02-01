@@ -4,6 +4,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout([
@@ -19,35 +20,26 @@ pipeline {
 
         stage('Compile') {
             steps {
-                bat 'mvn clean compile'
+                dir('gestion_commande') {   // ✅ BON DOSSIER
+                    bat 'mvnw.cmd clean compile'
+                }
             }
         }
 
         stage('Test') {
             steps {
-                bat 'mvn test'
+                dir('gestion_commande') {   // ✅ BON DOSSIER
+                    bat 'mvnw.cmd test'
+                }
             }
         }
 
         stage('Package') {
             steps {
-                bat 'mvn clean package -DskipTests'
+                dir('gestion_commande') {   // ✅ BON DOSSIER
+                    bat 'mvnw.cmd clean package -DskipTests'
+                }
             }
-        }
-
-        stage('Archive') {
-            steps {
-                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-            }
-        }
-    }
-
-    post {
-        success {
-            echo '✅ Backend Spring Boot build réussi!'
-        }
-        failure {
-            echo '❌ Build échoué'
         }
     }
 }
