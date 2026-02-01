@@ -1,13 +1,12 @@
 pipeline {
-    agent any  // ou 'agent-windows' si vous l'avez configuré
+    agent any
 
     stages {
-        // Étape 1: Récupération du code
         stage('Checkout') {
             steps {
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: '*/master']],
+                    branches: [[name: '*/main']],  // ICI: utiliser main
                     userRemoteConfigs: [[
                         url: 'https://github.com/faty-mbengue/gestion-commande-backend.git',
                         credentialsId: 'tokenguitup'
@@ -16,30 +15,16 @@ pipeline {
             }
         }
 
-        // Étape 2: Tests unitaires Maven
-        stage('Run Unit Tests') {
+        stage('Test') {
             steps {
                 bat 'mvn test'
             }
-
-            post {
-                success {
-                    echo '✅ Tous les tests unitaires ont réussi'
-                }
-                failure {
-                    echo '❌ Certains tests ont échoué'
-                    // Le pipeline s'arrêtera automatiquement en cas d'échec
-                }
-            }
         }
-    }
 
-    post {
-        always {
-            echo "Build #${BUILD_NUMBER} - Test du backend terminé"
-
-            // Nettoyage
-            cleanWs()
+        stage('Build') {
+            steps {
+                bat 'mvn clean package -DskipTests'
+            }
         }
     }
 }
