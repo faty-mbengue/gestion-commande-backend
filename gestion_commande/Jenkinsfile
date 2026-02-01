@@ -1,62 +1,53 @@
 pipeline {
-    // Définir l’agent Jenkins sur lequel s'exécute le pipeline
-        // agent any
+    agent {
+        label 'agent-windows'
+    }
 
-       agent {
-            label 'agent-windows'
-        }
-
-
-        environment {
-            // Définir des variables d’environnement pour l’image Docker
-             DOCKERHUB_USER = "encvr1"
-             BACKEND_IMAGE  = "${DOCKERHUB_USER}/backend-courrier"
-             BACKEND_TAG    = "1.${BUILD_NUMBER}"
-        }
-
-        stages {
-
-            stage('Checkout Code') {
-                steps {
-                    // Récupérer le code source depuis le dépôt Git (SCM)
-                    checkout scm
-                }
-            }
-
-
-            //  Build Backend Docker Image
-            stage('Build Backend Docker Image') {
-                 steps {
-                     script {
-                   bat "docker build -t %BACKEND_IMAGE%:%BACKEND_TAG% ."
-                      }
-
-                 }
-            }
-
-
-
-            stage('Deploy with Docker Compose') {
-                steps {
-                    // Déployer les services avec Docker Compose en mode détaché
-                    // bat "docker-compose down || true"
-                    bat "docker-compose up -d --build"
-
-                }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/faty-mbengue/gestion-commande-backend.git',
+                        credentialsId: 'tokenguitup'
+                    ]]
+                ])
             }
         }
 
-        post {
-            success {
-                // Afficher un message si le pipeline réussit
-                echo " Déploiement réussi"
+        stage('Compile') {
+            steps {
+                bat 'mvn clean compile'
             }
-            failure {
-                // Afficher un message si le pipeline échoue
-                echo " Le pipeline a échoué, vérifie les logs Jenkins."
-            }
-
-
-
         }
+
+        stage('Test') {
+            steps {
+                bat 'mvn test'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                bat 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Archive') {
+            steps {
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Backend Spring Boot build réussi!'
+        }
+        failure {
+            echo '❌ Build échoué'
+        }
+    }
 }
