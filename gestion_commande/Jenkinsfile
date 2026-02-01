@@ -4,212 +4,46 @@ pipeline {
     }
 
     environment {
-        // Variables Docker
-        DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE_NAME = 'fatymbengue/gestion-commande-backend'
         DOCKER_TAG = "${env.BUILD_NUMBER}"
-        DOCKER_CREDENTIALS_ID = '0b645248-5ff1-4028-9402-f5c77efce425'
     }
 
     stages {
-        // Étape 1: Checkout du code
-        stage('Checkout') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/faty-mbengue/gestion-commande-backend.git',
-                        credentialsId: 'tokenguitup'
-                    ]]
-                ])
-            }
-        }
-
-        // Étape 2: Vérification Docker
-        stage('Verify Docker') {
-            steps {
-                script {
-                    echo "🔧 Vérification de Docker..."
-
-                    bat '''
-                        docker --version
-                        if %errorlevel% neq 0 (
-                            echo "❌ Docker n'est pas installé"
-                            exit 1
-                        )
-                        echo ✅ Docker est installé
-                    '''
-                }
-            }
-        }
-
-        // Étape 3: Compilation
-        stage('Compile') {
+        // Étape 1: Build et tests
+        stage('Build and Test') {
             steps {
                 dir('gestion_commande') {
-                    bat 'mvnw.cmd clean compile'
+                    bat 'mvnw.cmd clean package'
                 }
             }
         }
 
-        // Étape 4: Tests
-        stage('Test') {
+        // Étape 2: Build Docker Image
+        stage('Build Docker') {
             steps {
                 dir('gestion_commande') {
-                    bat 'mvnw.cmd test'
+                    bat "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ."
+                    bat "docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}:latest"
                 }
             }
         }
 
-        // Étape 5: Packaging
-        stage('Package') {
-            steps {
-                dir('gestion_commande') {
-                    bat 'mvnw.cmd clean package -DskipTests'
-
-                    bat '''
-                        if exist target\\*.jar (
-                            echo ✅ JAR généré avec succès
-                            dir /b target\\*.jar
-                        ) else (
-                            echo ❌ Aucun JAR trouvé
-                            exit 1
-                        )
-                    '''
-                }
-            }
-        }
-
-        // Étape 6: Mise à jour du Dockerfile
-        stage('Update Dockerfile') {
-            steps {
-                dir('gestion_commande') {
-                    script {
-                        echo "📄 Mise à jour du Dockerfile..."
-
-                        // Créer/remplacer le Dockerfile avec une image valide
-                        writeFile file: 'Dockerfile', text: '''# Dockerfile pour Spring Boot avec Java 21
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-COPY target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]'''
-
-                        // Afficher le contenu
-                        bat 'type Dockerfile'
-                    }
-                }
-            }
-        }
-
-        // Étape 7: Build de l'image Docker
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    dir('gestion_commande') {
-                        echo "🐳 Construction de l'image Docker..."
-
-                        // Test de la connexion Docker Hub
-                        bat '''
-                            echo Test de la connexion à Docker Hub...
-                            docker pull eclipse-temurin:21-jre-alpine
-                        '''
-
-                        // Construire l'image
-                        bat """
-                            docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} .
-                            echo ✅ Image construite : ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-                        """
-
-                        // Ajouter le tag latest
-                        bat """
-                            docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}:latest
-                        """
-
-                        // Lister les images
-                        bat 'docker images | findstr "fatymbengue"'
-                    }
-                }
-            }
-        }
-
-        // Étape 8: Test de l'image Docker
-        stage('Test Docker Image') {
-            steps {
-                script {
-                    echo "🧪 Test rapide de l'image..."
-
-                    bat """
-                        docker run --rm ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} --version || echo "Test version échoué, mais l'image existe"
-                        echo ✅ Image Docker prête
-                    """
-                }
-            }
-        }
-
-        // Étape 9: Push vers Docker Hub
+        // Étape 3: Push to Docker Hub
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    echo "🚀 Envoi vers Docker Hub..."
-
-                    // Login à Docker Hub
                     withCredentials([usernamePassword(
-                        credentialsId: "${DOCKER_CREDENTIALS_ID}",
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
+                        credentialsId: '0b645248-5ff1-4028-9402-f5c77efce425',
+                        usernameVariable: 'USER',
+                        passwordVariable: 'PASS'
                     )]) {
                         bat """
-                            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                            if %errorlevel% neq 0 (
-                                echo "❌ Échec de la connexion à Docker Hub"
-                                exit 1
-                            )
+                            echo %PASS% | docker login -u %USER% --password-stdin
+                            docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+                            docker push ${DOCKER_IMAGE_NAME}:latest
+                            docker logout
                         """
                     }
-
-                    // Push de l'image
-                    bat """
-                        echo Envoi de l'image...
-                        docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-                        if %errorlevel% neq 0 (
-                            echo "❌ Échec du push de l'image taguée"
-                            exit 1
-                        )
-                        echo ✅ Image ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} envoyée
-                    """
-
-                    // Push de latest
-                    bat """
-                        docker push ${DOCKER_IMAGE_NAME}:latest
-                        if %errorlevel% neq 0 (
-                            echo "⚠ Échec du push de latest, mais tag principale envoyée"
-                        ) else (
-                            echo ✅ Image ${DOCKER_IMAGE_NAME}:latest envoyée
-                        )
-                    """
-
-                    // Logout
-                    bat '''
-                        docker logout
-                        echo ✅ Déconnecté de Docker Hub
-                    '''
-                }
-            }
-        }
-
-        // Étape 10: Nettoyage
-        stage('Cleanup') {
-            steps {
-                script {
-                    echo "🧹 Nettoyage..."
-
-                    bat '''
-                        docker rmi ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} 2>nul || echo "Image déjà supprimée"
-                        docker rmi ${DOCKER_IMAGE_NAME}:latest 2>nul || echo "Image latest déjà supprimée"
-                        docker system prune -f 2>nul || echo "Nettoyage Docker échoué"
-                    '''
                 }
             }
         }
@@ -218,39 +52,11 @@ ENTRYPOINT ["java", "-jar", "app.jar"]'''
     post {
         success {
             echo """
-            🎉 PIPELINE RÉUSSI ! 🎉
-
-            ✅ Code compilé et testé
-            ✅ JAR généré
-            ✅ Image Docker construite
-            ✅ Image publiée sur Docker Hub
-
-            📦 Image : ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-            📦 Latest : ${DOCKER_IMAGE_NAME}:latest
-
-            🌐 Docker Hub : https://hub.docker.com/r/fatymbengue/gestion-commande-backend
-
-            🚀 Pour exécuter :
-            docker run -p 8080:8080 fatymbengue/gestion-commande-backend:latest
+            🎉 SUCCÈS !
+            Image Docker publiée sur Docker Hub:
+            - ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+            - ${DOCKER_IMAGE_NAME}:latest
             """
-        }
-
-        failure {
-            echo """
-            ❌ PIPELINE ÉCHOUÉ ❌
-
-            🔧 Dépannage :
-            1. Vérifier l'image Docker dans le Dockerfile
-            2. Vérifier la connexion Internet
-            3. Vérifier les credentials Docker Hub
-            4. Vérifier que Docker Desktop est en cours d'exécution
-            """
-        }
-
-        always {
-            // Nettoyage sans erreur
-            bat 'docker logout 2>nul || echo ""'
-            echo "🧹 Fin du pipeline"
         }
     }
 }
