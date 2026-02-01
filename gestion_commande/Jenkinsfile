@@ -19,35 +19,26 @@ pipeline {
 
         stage('Compile') {
             steps {
-                bat 'mvnw.cmd clean compile'
+                dir('.') {  // S'assurer d'être à la racine
+                    bat '.\\mvnw.cmd clean compile'
+                }
             }
         }
 
         stage('Test') {
             steps {
-                bat 'mvnw.cmd test'
+                dir('.') {
+                    bat '.\\mvnw.cmd test'
+                }
             }
         }
 
         stage('Package') {
             steps {
-                bat 'mvnw.cmd clean package -DskipTests'
+                dir('.') {
+                    bat '.\\mvnw.cmd clean package -DskipTests'
+                }
             }
-        }
-        
-        stage('Archive') {
-            steps {
-                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-            }
-        }
-    }
-    
-    post {
-        success {
-            echo '✅ Build Spring Boot réussi!'
-        }
-        failure {
-            echo '❌ Build échoué'
         }
     }
 }
