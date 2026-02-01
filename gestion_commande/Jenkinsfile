@@ -20,7 +20,7 @@ pipeline {
 
         stage('Compile') {
             steps {
-                dir('gestion_commande') {   // ✅ BON DOSSIER
+                dir('gestion_commande') {
                     bat 'mvnw.cmd clean compile'
                 }
             }
@@ -28,7 +28,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                dir('gestion_commande') {   // ✅ BON DOSSIER
+                dir('gestion_commande') {
                     bat 'mvnw.cmd test'
                 }
             }
@@ -36,7 +36,7 @@ pipeline {
 
         stage('Package') {
             steps {
-                dir('gestion_commande') {   // ✅ BON DOSSIER
+                dir('gestion_commande') {
                     bat 'mvnw.cmd clean package -DskipTests'
                 }
             }
