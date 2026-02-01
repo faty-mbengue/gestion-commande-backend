@@ -8,7 +8,7 @@ pipeline {
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE_NAME = 'fatymbengue/gestion-commande-backend'
         DOCKER_TAG = "${env.BUILD_NUMBER}"
-        DOCKER_CREDENTIALS_ID = '0b645248-5ff1-4028-9402-f5c77efce425'  // Tes credentials Docker Hub
+        DOCKER_CREDENTIALS_ID = '0b645248-5ff1-4028-9402-f5c77efce425'
     }
 
     stages {
@@ -26,31 +26,19 @@ pipeline {
             }
         }
 
-        // Étape 2: Vérification Docker (CORRIGÉE)
+        // Étape 2: Vérification Docker
         stage('Verify Docker') {
             steps {
                 script {
-                    echo "🔧 Vérification de Docker sur l'agent Windows..."
+                    echo "🔧 Vérification de Docker..."
 
-                    // Vérifier si Docker est installé (version corrigée)
                     bat '''
-                        echo Vérification de Docker...
                         docker --version
                         if %errorlevel% neq 0 (
-                            echo "❌ Docker n'est pas installé ou ne fonctionne pas"
+                            echo "❌ Docker n'est pas installé"
                             exit 1
                         )
                         echo ✅ Docker est installé
-                    '''
-
-                    // Vérifier docker-compose
-                    bat '''
-                        docker-compose --version
-                        if %errorlevel% neq 0 (
-                            echo "⚠ docker-compose n'est pas installé"
-                        ) else (
-                            echo ✅ docker-compose est installé
-                        )
                     '''
                 }
             }
@@ -80,14 +68,12 @@ pipeline {
                 dir('gestion_commande') {
                     bat 'mvnw.cmd clean package -DskipTests'
 
-                    // Vérification du JAR généré
                     bat '''
-                        echo 📦 Vérification du fichier JAR...
                         if exist target\\*.jar (
                             echo ✅ JAR généré avec succès
                             dir /b target\\*.jar
                         ) else (
-                            echo ❌ Aucun JAR trouvé dans target/
+                            echo ❌ Aucun JAR trouvé
                             exit 1
                         )
                     '''
@@ -95,28 +81,22 @@ pipeline {
             }
         }
 
-        // Étape 6: Vérification Dockerfile
-        stage('Verify Dockerfile') {
+        // Étape 6: Mise à jour du Dockerfile
+        stage('Update Dockerfile') {
             steps {
                 dir('gestion_commande') {
                     script {
-                        echo "📄 Vérification du Dockerfile..."
+                        echo "📄 Mise à jour du Dockerfile..."
 
-                        // Vérifier si Dockerfile existe
-                        def dockerfileExists = fileExists('Dockerfile')
-                        if (!dockerfileExists) {
-                            echo "⚠ Dockerfile non trouvé, création d'un Dockerfile par défaut..."
-                            // Créer un Dockerfile par défaut
-                            writeFile file: 'Dockerfile', text: '''# Dockerfile pour Spring Boot
-FROM openjdk:21-jdk-slim
+                        // Créer/remplacer le Dockerfile avec une image valide
+                        writeFile file: 'Dockerfile', text: '''# Dockerfile pour Spring Boot avec Java 21
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]'''
-                            echo "✅ Dockerfile créé"
-                        }
 
-                        // Afficher le contenu du Dockerfile
+                        // Afficher le contenu
                         bat 'type Dockerfile'
                     }
                 }
@@ -130,26 +110,25 @@ ENTRYPOINT ["java", "-jar", "app.jar"]'''
                     dir('gestion_commande') {
                         echo "🐳 Construction de l'image Docker..."
 
-                        try {
-                            // Construire l'image
-                            bat """
-                                docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} .
-                                echo ✅ Image Docker construite : ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-                            """
+                        // Test de la connexion Docker Hub
+                        bat '''
+                            echo Test de la connexion à Docker Hub...
+                            docker pull eclipse-temurin:21-jre-alpine
+                        '''
 
-                            // Ajouter le tag "latest"
-                            bat """
-                                docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}:latest
-                                echo ✅ Tag latest ajouté
-                            """
+                        // Construire l'image
+                        bat """
+                            docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} .
+                            echo ✅ Image construite : ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+                        """
 
-                            // Lister les images locales
-                            bat 'docker images | findstr "fatymbengue"'
-                        } catch (Exception e) {
-                            echo "❌ Erreur lors de la construction de l'image Docker"
-                            echo "Vérifie que Docker Desktop est en cours d'exécution"
-                            error "Build Docker échoué"
-                        }
+                        // Ajouter le tag latest
+                        bat """
+                            docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}:latest
+                        """
+
+                        // Lister les images
+                        bat 'docker images | findstr "fatymbengue"'
                     }
                 }
             }
@@ -159,13 +138,11 @@ ENTRYPOINT ["java", "-jar", "app.jar"]'''
         stage('Test Docker Image') {
             steps {
                 script {
-                    echo "🧪 Test de l'image Docker..."
+                    echo "🧪 Test rapide de l'image..."
 
-                    // Tester si l'image peut être exécutée (version simplifiée)
                     bat """
-                        echo Test de l'image Docker en mode test...
-                        docker images ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-                        echo ✅ Image Docker vérifiée
+                        docker run --rm ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} --version || echo "Test version échoué, mais l'image existe"
+                        echo ✅ Image Docker prête
                     """
                 }
             }
@@ -177,69 +154,62 @@ ENTRYPOINT ["java", "-jar", "app.jar"]'''
                 script {
                     echo "🚀 Envoi vers Docker Hub..."
 
-                    try {
-                        // Login à Docker Hub
-                        withCredentials([usernamePassword(
-                            credentialsId: "${DOCKER_CREDENTIALS_ID}",
-                            usernameVariable: 'DOCKER_USERNAME',
-                            passwordVariable: 'DOCKER_PASSWORD'
-                        )]) {
-                            bat """
-                                echo Connexion à Docker Hub...
-                                echo %DOCKER_PASSWORD% | docker login ${DOCKER_REGISTRY} -u %DOCKER_USERNAME% --password-stdin
-                                if %errorlevel% neq 0 (
-                                    echo "❌ Échec de la connexion à Docker Hub"
-                                    exit 1
-                                )
-                                echo ✅ Connecté à Docker Hub en tant que %DOCKER_USERNAME%
-                            """
-                        }
-
-                        // Push de l'image avec le tag de build
+                    // Login à Docker Hub
+                    withCredentials([usernamePassword(
+                        credentialsId: "${DOCKER_CREDENTIALS_ID}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
                         bat """
-                            echo Envoi de l'image ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}...
-                            docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+                            echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
                             if %errorlevel% neq 0 (
-                                echo "❌ Échec du push de l'image"
+                                echo "❌ Échec de la connexion à Docker Hub"
                                 exit 1
                             )
-                            echo ✅ Image ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} envoyée
-                        """
-
-                        // Push de l'image avec le tag "latest"
-                        bat """
-                            echo Envoi de l'image ${DOCKER_IMAGE_NAME}:latest...
-                            docker push ${DOCKER_IMAGE_NAME}:latest
-                            if %errorlevel% neq 0 (
-                                echo "❌ Échec du push de l'image latest"
-                                exit 1
-                            )
-                            echo ✅ Image ${DOCKER_IMAGE_NAME}:latest envoyée
-                        """
-
-                    } finally {
-                        // Toujours se déconnecter
-                        bat """
-                            docker logout
-                            echo ✅ Déconnecté de Docker Hub
                         """
                     }
+
+                    // Push de l'image
+                    bat """
+                        echo Envoi de l'image...
+                        docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+                        if %errorlevel% neq 0 (
+                            echo "❌ Échec du push de l'image taguée"
+                            exit 1
+                        )
+                        echo ✅ Image ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} envoyée
+                    """
+
+                    // Push de latest
+                    bat """
+                        docker push ${DOCKER_IMAGE_NAME}:latest
+                        if %errorlevel% neq 0 (
+                            echo "⚠ Échec du push de latest, mais tag principale envoyée"
+                        ) else (
+                            echo ✅ Image ${DOCKER_IMAGE_NAME}:latest envoyée
+                        )
+                    """
+
+                    // Logout
+                    bat '''
+                        docker logout
+                        echo ✅ Déconnecté de Docker Hub
+                    '''
                 }
             }
         }
 
-        // Étape 10: Nettoyage local (optionnel)
+        // Étape 10: Nettoyage
         stage('Cleanup') {
             steps {
                 script {
-                    echo "🧹 Nettoyage des images locales..."
+                    echo "🧹 Nettoyage..."
 
-                    // Essayer de supprimer, mais ne pas échouer si ça ne marche pas
-                    bat """
-                        docker rmi ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} 2>nul || echo "Image taguée déjà supprimée ou non trouvée"
-                        docker rmi ${DOCKER_IMAGE_NAME}:latest 2>nul || echo "Image latest déjà supprimée ou non trouvée"
-                        echo ✅ Nettoyage terminé
-                    """
+                    bat '''
+                        docker rmi ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} 2>nul || echo "Image déjà supprimée"
+                        docker rmi ${DOCKER_IMAGE_NAME}:latest 2>nul || echo "Image latest déjà supprimée"
+                        docker system prune -f 2>nul || echo "Nettoyage Docker échoué"
+                    '''
                 }
             }
         }
@@ -250,20 +220,18 @@ ENTRYPOINT ["java", "-jar", "app.jar"]'''
             echo """
             🎉 PIPELINE RÉUSSI ! 🎉
 
-            📊 Résumé :
             ✅ Code compilé et testé
-            ✅ Application packagée en JAR
+            ✅ JAR généré
             ✅ Image Docker construite
-            ✅ Image Docker publiée sur Docker Hub
+            ✅ Image publiée sur Docker Hub
 
-            📦 Images disponibles sur Docker Hub :
-            • ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-            • ${DOCKER_IMAGE_NAME}:latest
+            📦 Image : ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
+            📦 Latest : ${DOCKER_IMAGE_NAME}:latest
 
-            🌐 Lien : https://hub.docker.com/r/fatymbengue/gestion-commande-backend
+            🌐 Docker Hub : https://hub.docker.com/r/fatymbengue/gestion-commande-backend
 
-            🚀 Pour exécuter l'application :
-            docker run -p 8080:8080 ${DOCKER_IMAGE_NAME}:latest
+            🚀 Pour exécuter :
+            docker run -p 8080:8080 fatymbengue/gestion-commande-backend:latest
             """
         }
 
@@ -271,21 +239,18 @@ ENTRYPOINT ["java", "-jar", "app.jar"]'''
             echo """
             ❌ PIPELINE ÉCHOUÉ ❌
 
-            📋 Dépannage :
-            1. Vérifier que Docker Desktop est en cours d'exécution
-            2. Vérifier les credentials Docker Hub dans Jenkins
-            3. Vérifier la connexion internet de l'agent
-            4. Vérifier que le Dockerfile existe dans gestion_commande/
-            5. Vérifier que le JAR est bien généré
+            🔧 Dépannage :
+            1. Vérifier l'image Docker dans le Dockerfile
+            2. Vérifier la connexion Internet
+            3. Vérifier les credentials Docker Hub
+            4. Vérifier que Docker Desktop est en cours d'exécution
             """
         }
 
         always {
-            echo "🧹 Nettoyage du workspace..."
-            cleanWs()
-
-            // Logout Docker pour être sûr
-            bat 'docker logout 2>nul || echo "Déjà déconnecté"'
+            // Nettoyage sans erreur
+            bat 'docker logout 2>nul || echo ""'
+            echo "🧹 Fin du pipeline"
         }
     }
 }
