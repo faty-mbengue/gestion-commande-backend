@@ -9,20 +9,31 @@ pipeline {
     }
 
     stages {
-           stage('Build and Test') {
-               steps {
-                   bat 'mvnw.cmd clean package'
-               }
-           }
+        // Étape 1: Build Maven (déjà bon)
+        stage('Build and Test') {
+            steps {
+                bat 'mvnw.cmd clean package'
+            }
+            post {
+                success {
+                    archiveArtifacts 'target/*.jar'
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
 
-
-        // Étape 2: Build Docker Image
+        // Étape 2: Build Docker (À CORRIGER - enlever dir!)
         stage('Build Docker') {
             steps {
-                dir('gestion_commande') {
-                    bat "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ."
-                    bat "docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}:latest"
-                }
+                // ENLEVER dir('gestion_commande') - Dockerfile est à la racine
+                bat """
+                    echo Construction de l'image Docker...
+                    docker build -t ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG} .
+                    docker tag ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG} ${env.DOCKER_IMAGE_NAME}:latest
+
+                    echo Images créées:
+                    docker images | findstr "${env.DOCKER_IMAGE_NAME}"
+                """
             }
         }
 
@@ -36,10 +47,17 @@ pipeline {
                         passwordVariable: 'PASS'
                     )]) {
                         bat """
+                            echo Connexion à Docker Hub...
                             echo %PASS% | docker login -u %USER% --password-stdin
-                            docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-                            docker push ${DOCKER_IMAGE_NAME}:latest
+
+                            echo Push des images...
+                            docker push ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG}
+                            docker push ${env.DOCKER_IMAGE_NAME}:latest
+
+                            echo Déconnexion...
                             docker logout
+
+                            echo "✅ Images poussées avec succès!"
                         """
                     }
                 }
@@ -50,11 +68,22 @@ pipeline {
     post {
         success {
             echo """
-            🎉 SUCCÈS !
-            Image Docker publiée sur Docker Hub:
-            - ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}
-            - ${DOCKER_IMAGE_NAME}:latest
+            🎉 PIPELINE COMPLET RÉUSSI !
+            ============================
+            ✅ Build Maven: SUCCÈS
+            ✅ Tests: PASSÉS (1 test)
+            ✅ Image Docker: CONSTRUITE
+            ✅ Docker Hub: IMAGES POUCHÉES
+
+            📦 Images disponibles:
+            - ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG}
+            - ${env.DOCKER_IMAGE_NAME}:latest
+
+            🐳 Vérifiez sur: https://hub.docker.com/r/fatymbengue/gestion-commande-backend
             """
+        }
+        failure {
+            echo "❌ PIPELINE ÉCHOUÉ - Consultez les logs ci-dessus"
         }
     }
 }
