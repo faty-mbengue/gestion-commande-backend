@@ -9,14 +9,12 @@ pipeline {
     }
 
     stages {
-        // Étape 1: Build et tests
-        stage('Build and Test') {
-            steps {
-                dir('gestion_commande') {
-                    bat 'mvnw.cmd clean package'
-                }
-            }
-        }
+           stage('Build and Test') {
+               steps {
+                   bat 'mvnw.cmd clean package'
+               }
+           }
+
 
         // Étape 2: Build Docker Image
         stage('Build Docker') {
