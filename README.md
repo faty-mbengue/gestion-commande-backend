@@ -1,31 +1,3 @@
-├── src/main/java/uadb/gestion_commande/
-│ ├── GestionCommandeApplication.java # Point d'entrée
-│ ├── config/
-│ │ └── CorsConfig.java # Configuration CORS
-│ ├── controller/ # Contrôleurs REST
-│ │ ├── ClientController.java
-│ │ ├── ProduitController.java
-│ │ ├── CommandeController.java
-│ │ └── HomeController.java
-│ ├── entity/ # Entités JPA
-│ │ ├── Client.java
-│ │ ├── Produit.java
-│ │ ├── Commande.java
-│ │ └── LigneCommande.java
-│ ├── repository/ # Repositories Spring Data
-│ │ ├── ClientRepository.java
-│ │ ├── ProduitRepository.java
-│ │ └── CommandeRepository.java
-│ └── service/ # Logique métier
-│ ├── ClientService.java
-│ ├── ProduitService.java
-│ └── CommandeService.java
-├── src/main/resources/
-│ ├── application.properties # Configuration
-│ └── data.sql (optionnel) # Données initiales
-└── pom.xml # Dépendances Maven
-
-text
 
 ## 🚀 Démarrage Rapide
 
@@ -53,10 +25,4 @@ Accès aux interfaces
 
 📚 Swagger UI : http://localhost:8085/swagger-ui.html
 
-🗄️ Console H2 : http://localhost:8085/h2-console
 
-URL JDBC : jdbc:h2:mem:testdb
-
-Utilisateur : sa
-
-Mot de passe : (laisser vide)
