@@ -2,6 +2,7 @@ package uadb.gestion_commande.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;  // ← AJOUTEZ CET IMPORT
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,5 +33,6 @@ public class Client {
     private String pays;
 
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore  // ← C'EST LA CLÉ ! Évite la référence circulaire
     private List<Commande> commandes = new ArrayList<>();
 }

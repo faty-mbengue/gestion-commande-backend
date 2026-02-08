@@ -2,6 +2,7 @@ package uadb.gestion_commande.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;  // AJOUT
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,9 +22,11 @@ public class Commande {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
+    @JsonIgnoreProperties({"commandes"})  // AJOUT ICI - ignore commandes dans Client
     private Client client;
 
     @OneToMany(mappedBy = "commande", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"commande"})  // AJOUT ICI - ignore commande dans LigneCommande
     private List<LigneCommande> ligneCommandes = new ArrayList<>();
 
     // Calcul du total de la commande
