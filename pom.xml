@@ -94,6 +94,13 @@
                     </excludes>
                 </configuration>
             </plugin>
+
+            <!-- Plugin SonarQube pour l'analyse -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.11.0.3922</version>
+            </plugin>
         </plugins>
     </build>
 </project>

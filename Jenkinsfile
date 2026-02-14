@@ -6,10 +6,36 @@ pipeline {
     environment {
         DOCKER_IMAGE_NAME = 'fatymbengue/gestion-commande-backend'
         DOCKER_TAG = "${env.BUILD_NUMBER}"
+        // Ajout des variables SonarQube
+        SONAR_PROJECT_KEY = 'gestion-commande-backend'
+        SONAR_HOST_URL = 'http://localhost:9000'
     }
 
     stages {
-        // Étape 1: Build Maven (déjà bon)
+        // Étape 1: Analyse SonarQube (NOUVELLE ÉTAPE)
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    bat """
+                        mvnw.cmd sonar:sonar ^
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} ^
+                        -Dsonar.host.url=${SONAR_HOST_URL} ^
+                        -Dsonar.java.binaries=target/classes
+                    """
+                }
+            }
+        }
+
+        // Étape 2: Quality Gate (NOUVELLE ÉTAPE)
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        // Étape 3: Build Maven (déplacée après Sonar)
         stage('Build and Test') {
             steps {
                 bat 'mvnw.cmd clean package'
@@ -22,10 +48,9 @@ pipeline {
             }
         }
 
-        // Étape 2: Build Docker (À CORRIGER - enlever dir!)
+        // Étape 4: Build Docker
         stage('Build Docker') {
             steps {
-                // ENLEVER dir('gestion_commande') - Dockerfile est à la racine
                 bat """
                     echo Construction de l'image Docker...
                     docker build -t ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG} .
@@ -37,7 +62,7 @@ pipeline {
             }
         }
 
-        // Étape 3: Push to Docker Hub
+        // Étape 5: Push to Docker Hub
         stage('Push to Docker Hub') {
             steps {
                 script {
@@ -70,16 +95,15 @@ pipeline {
             echo """
             🎉 PIPELINE COMPLET RÉUSSI !
             ============================
+            ✅ Analyse SonarQube: COMPLÉTÉE
+            ✅ Quality Gate: PASSÉ
             ✅ Build Maven: SUCCÈS
-            ✅ Tests: PASSÉS (1 test)
+            ✅ Tests: PASSÉS
             ✅ Image Docker: CONSTRUITE
-            ✅ Docker Hub: IMAGES POUCHÉES
+            ✅ Docker Hub: IMAGES POUSSÉES
 
-            📦 Images disponibles:
-            - ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG}
-            - ${env.DOCKER_IMAGE_NAME}:latest
-
-            🐳 Vérifiez sur: https://hub.docker.com/r/fatymbengue/gestion-commande-backend
+            📊 Tableau de bord SonarQube: ${SONAR_HOST_URL}/dashboard?id=${SONAR_PROJECT_KEY}
+            📦 Images Docker: ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_TAG}
             """
         }
         failure {
